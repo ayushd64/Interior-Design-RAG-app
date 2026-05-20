@@ -32,7 +32,7 @@ router = APIRouter()
 # ── Initialize LLM For Streaming ──────────────────
 streaming_llm = ChatOllama(
     base_url   = os.getenv("OLLAMA_BASE_URL",
-                           "http://localhost:11434"),
+                           "http://127.0.0.1:11434"),
     model      = os.getenv("OLLAMA_MODEL",
                            "llama3.1:8b"),
     temperature= 0.7,
@@ -40,7 +40,17 @@ streaming_llm = ChatOllama(
 )
 
 # ── Initialize Retriever ──────────────────────────
-retriever  = get_retriever()
+# ── Lazy Retriever Initialization ─────────────────
+_retriever = None
+
+def _get_retriever():
+    """Lazy load retriever after vector DB initialized"""
+    global _retriever
+    if _retriever is None:
+        _retriever = get_retriever()
+    return _retriever
+
+
 parser     = StrOutputParser()
 
 # ─────────────────────────────────────────────────
@@ -189,7 +199,7 @@ What would you like to know about interior design?"""
             print(f"--- User Level: {user_level} ---")
 
             # ── Step 3: Retrieve Documents ────────
-            documents = retriever.invoke(request.question)
+            documents = _get_retriever().invoke(request.question)
             print(f"--- Retrieved {len(documents)} docs ---")
 
             # ── Step 4: Build Context ─────────────

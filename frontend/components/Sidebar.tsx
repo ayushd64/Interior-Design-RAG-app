@@ -1,5 +1,7 @@
+// components/Sidebar.tsx
 "use client"
 
+import { User } from "firebase/auth"
 import { Chat } from "../app/types"
 
 interface SidebarProps {
@@ -8,6 +10,8 @@ interface SidebarProps {
   onNewChat     : () => void
   onSelectChat  : (chatId: string) => void
   onDeleteChat  : (chatId: string) => void
+  user          : User | null
+  onSignOut     : () => Promise<void>
 }
 
 export default function Sidebar({
@@ -15,8 +19,25 @@ export default function Sidebar({
   currentChatId,
   onNewChat,
   onSelectChat,
-  onDeleteChat
+  onDeleteChat,
+  user,
+  onSignOut
 }: SidebarProps) {
+
+  // ── Get User Display Info ─────────────────────
+  const displayName  = user?.displayName || "User"
+  const email        = user?.email || ""
+  const photoURL     = user?.photoURL
+  const firstLetter  = displayName.charAt(0).toUpperCase()
+
+  // ── Handle Sign Out ───────────────────────────
+  const handleSignOut = async () => {
+    const confirmed = confirm("Are you sure you want to sign out?")
+    if (confirmed) {
+      await onSignOut()
+    }
+  }
+
   return (
     <div className="sidebar">
 
@@ -76,12 +97,31 @@ export default function Sidebar({
         ))}
       </div>
 
-      {/* ── Footer ──────────────────────────── */}
-      <div className="sidebar-footer">
-        <p>Powered by <span>Llama 3.1</span></p>
-        <p>Running <span>100% Locally</span></p>
+      {/* ── User Profile ────────────────────── */}
+      <div className="user-profile">
+        <div className="user-avatar">
+          {photoURL ? (
+            <img src={photoURL} alt={displayName} />
+          ) : (
+            <span>{firstLetter}</span>
+          )}
+        </div>
+        
+        <div className="user-info">
+          <div className="user-name">{displayName}</div>
+          <div className="user-email">{email}</div>
+        </div>
+
+        <button
+          onClick={handleSignOut}
+          className="signout-btn"
+          title="Sign out"
+        >
+          ⎋
+        </button>
       </div>
 
     </div>
   )
 }
+

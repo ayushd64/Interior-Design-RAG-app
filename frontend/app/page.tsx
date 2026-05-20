@@ -1,26 +1,56 @@
 // app/page.tsx
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import Sidebar from "../components/Sidebar"
 import ChatWindow from "../components/ChatWindow"
 import InputBar from "../components/InputBar"
+import ProtectedRoute from "../components/ProtectedRoute"
+import { useAuth } from "./context/AuthContext"
 import { Chat, Message, HistoryMessage } from "./types"
-import { sendMessageStream } from "./services/api"
+import {
+  sendMessageStream,
+  fetchAllChats,
+  createChatInDB,
+  updateChatTitle,
+  addMessageToDB,
+  deleteChatFromDB
+} from "./services/api"
 
 const generateId = () => Math.random().toString(36).substr(2, 9)
 
-export default function Home() {
+// ── Main App Component (wrapped in auth) ──────
+function HomeContent() {
 
+  const { user, signOut } = useAuth()
+  
   const [chats, setChats]                 = useState<Chat[]>([])
   const [currentChatId, setCurrentChatId] = useState<string | null>(null)
   const [isLoading, setIsLoading]         = useState(false)
   const [streamingId, setStreamingId]     = useState<string | null>(null)
+  const [isInitialized, setIsInitialized] = useState(false)
+
+  // ── Load Chats From DB On Mount ───────────────
+  useEffect(() => {
+    const loadChats = async () => {
+      console.log("Loading chats from database...")
+      try {
+        const loadedChats = await fetchAllChats()
+        setChats(loadedChats)
+      } catch (err) {
+        console.error("Failed to load chats:", err)
+      } finally {
+        setIsInitialized(true)
+      }
+    }
+    
+    loadChats()
+  }, [])
 
   const currentChat = chats.find(c => c.id === currentChatId)
   const messages    = currentChat?.messages || []
 
-  // ── Build History From Current Chat ──────────
+  // ── Build History ─────────────────────────────
   const buildHistory = useCallback((
     chatMessages: Message[]
   ): HistoryMessage[] => {
@@ -32,52 +62,53 @@ export default function Home() {
       }))
   }, [])
 
+  // ── New Chat ──────────────────────────────────
   const handleNewChat = useCallback(() => {
-    const newChat: Chat = {
-      id       : generateId(),
-      title    : "New Chat",
-      messages : [],
-      createdAt: new Date()
-    }
-    setChats(prev => [newChat, ...prev])
-    setCurrentChatId(newChat.id)
+    setCurrentChatId(null)
   }, [])
 
+  // ── Select Chat ───────────────────────────────
   const handleSelectChat = useCallback((chatId: string) => {
     setCurrentChatId(chatId)
   }, [])
 
-  const handleDeleteChat = useCallback((chatId: string) => {
+  // ── Delete Chat ───────────────────────────────
+  const handleDeleteChat = useCallback(async (chatId: string) => {
     setChats(prev => prev.filter(c => c.id !== chatId))
     if (currentChatId === chatId) {
       setCurrentChatId(null)
     }
+    await deleteChatFromDB(chatId)
   }, [currentChatId])
 
+  // ── Send Message ──────────────────────────────
   const handleSend = useCallback(async (question: string) => {
-
     let chatId = currentChatId
+    let isNewChat = false
+
     if (!chatId) {
       const newChat: Chat = {
         id       : generateId(),
-        title    : question.slice(0, 30) + "...",
+        title    : question.slice(0, 30) + (question.length > 30 ? "..." : ""),
         messages : [],
         createdAt: new Date()
       }
+      
+      isNewChat = true
+      chatId = newChat.id
+      
       setChats(prev => [newChat, ...prev])
       setCurrentChatId(newChat.id)
-      chatId = newChat.id
+      
+      await createChatInDB(newChat)
     }
 
-    // ── Get current messages for history ──────
     const currentMessages = chats.find(
       c => c.id === chatId
     )?.messages || []
-
-    // ── Build history BEFORE adding new message ─
+    
     const history = buildHistory(currentMessages)
 
-    // ── Add User Message ──────────────────────
     const userMessage: Message = {
       id       : generateId(),
       role     : "user",
@@ -90,14 +121,22 @@ export default function Home() {
         ? {
             ...chat,
             title   : chat.messages.length === 0
-              ? question.slice(0, 30) + "..."
+              ? question.slice(0, 30) + (question.length > 30 ? "..." : "")
               : chat.title,
             messages: [...chat.messages, userMessage]
           }
         : chat
     ))
 
-    // ── Create Empty Assistant Message ────────
+    await addMessageToDB(chatId, userMessage)
+    
+    if (isNewChat) {
+      await updateChatTitle(
+        chatId,
+        question.slice(0, 30) + (question.length > 30 ? "..." : "")
+      )
+    }
+
     const assistantId = generateId()
     const assistantMessage: Message = {
       id        : assistantId,
@@ -119,11 +158,15 @@ export default function Home() {
     setIsLoading(true)
     setStreamingId(assistantId)
 
+    let finalContent = ""
+    let finalUserLevel = ""
+
     await sendMessageStream(
       question,
-      history,              // ← Pass history!
+      history,
 
       (token: string) => {
+        finalContent += token
         setChats(prev => prev.map(chat =>
           chat.id === chatId
             ? {
@@ -139,6 +182,7 @@ export default function Home() {
       },
 
       (userLevel: string) => {
+        finalUserLevel = userLevel
         setChats(prev => prev.map(chat =>
           chat.id === chatId
             ? {
@@ -153,14 +197,27 @@ export default function Home() {
         ))
       },
 
-      () => {
+      async () => {
         setIsLoading(false)
         setStreamingId(null)
-        console.log("Stream complete!")
+        
+        const completeMessage: Message = {
+          id        : assistantId,
+          role      : "assistant",
+          content   : finalContent,
+          user_level: finalUserLevel,
+          timestamp : new Date()
+        }
+        
+        await addMessageToDB(chatId!, completeMessage)
+        console.log("Message saved!")
       },
 
-      (error: string) => {
+      async (error: string) => {
         console.error("Stream error:", error)
+        
+        const errorContent = "Sorry! Something went wrong. Please try again."
+        
         setChats(prev => prev.map(chat =>
           chat.id === chatId
             ? {
@@ -169,19 +226,39 @@ export default function Home() {
                   msg.id === assistantId
                     ? {
                         ...msg,
-                        content: "Sorry! Something went wrong. Please try again."
+                        content: errorContent
                       }
                     : msg
                 )
               }
             : chat
         ))
+        
+        const errorMessage: Message = {
+          id        : assistantId,
+          role      : "assistant",
+          content   : errorContent,
+          timestamp : new Date()
+        }
+        
+        await addMessageToDB(chatId!, errorMessage)
+        
         setIsLoading(false)
         setStreamingId(null)
       }
     )
 
   }, [currentChatId, chats, buildHistory])
+
+  // ── Loading State ─────────────────────────────
+  if (!isInitialized) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-spinner">🏠</div>
+        <p>Loading your conversations...</p>
+      </div>
+    )
+  }
 
   return (
     <main className="app-container">
@@ -192,6 +269,8 @@ export default function Home() {
         onNewChat={handleNewChat}
         onSelectChat={handleSelectChat}
         onDeleteChat={handleDeleteChat}
+        user={user}              
+        onSignOut={signOut}      
       />
 
       <div className="main-content">
@@ -228,3 +307,13 @@ export default function Home() {
     </main>
   )
 }
+
+// ── Wrap In Protected Route ────────────────────
+export default function Home() {
+  return (
+    <ProtectedRoute>
+      <HomeContent />
+    </ProtectedRoute>
+  )
+}
+

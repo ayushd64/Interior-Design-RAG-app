@@ -20,14 +20,24 @@ load_dotenv()
 # ── Initialize LLM ────────────────────────────────
 llm = ChatOllama(
     base_url   = os.getenv("OLLAMA_BASE_URL", 
-                           "http://localhost:11434"),
+                           "http://127.0.0.1:11434"),
     model      = os.getenv("OLLAMA_MODEL", 
                            "llama3.1:8b"),
     temperature= 0.7
 )
 
 # ── Initialize Retriever ──────────────────────────
-retriever = get_retriever()
+# ── Lazy Retriever Initialization ─────────────────
+_retriever = None
+
+def _get_retriever():
+    """Lazy load retriever after vector DB initialized"""
+    global _retriever
+    if _retriever is None:
+        _retriever = get_retriever()
+    return _retriever
+
+
 
 # ── Output Parser ─────────────────────────────────
 parser = StrOutputParser()
@@ -128,7 +138,7 @@ def retrieve_node(state: GraphState) -> GraphState:
     print("--- NODE: Retrieving documents ---")
 
     question  = state["question"]
-    documents = retriever.invoke(question)
+    documents = _get_retriever().invoke(question)
 
     print(f"--- Retrieved {len(documents)} documents ---")
 
