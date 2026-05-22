@@ -3,6 +3,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from typing import List, Optional
 from datetime import datetime
 from database.base import DatabaseRepository
+from database.metrics_models import MetricLog
 from database.models import (
     ChatModel,
     MessageModel,
@@ -29,6 +30,7 @@ class MongoDBRepository(DatabaseRepository):
             "interior_design_rag"
         )
         self.collection_name = "chats"
+        self.metrics_collection_name = "metrics"
     
     # ── Connection ────────────────────────────────
     async def connect(self) -> None:
@@ -40,6 +42,7 @@ class MongoDBRepository(DatabaseRepository):
             )
             self.database   = self.client[self.db_name]
             self.collection = self.database[self.collection_name]
+            self.metrics_collection = self.database[self.metrics_collection_name]
             await self.client.admin.command('ping')
             print("✅ MongoDB connected successfully!")
             print(f"   Database: {self.db_name}")
@@ -159,4 +162,55 @@ class MongoDBRepository(DatabaseRepository):
             "user_id": user_id
         })
         return result.deleted_count
+    
+    # ── Metrics Operations ────────────────────────
+    async def log_metric(
+        self,
+        metric: MetricLog
+    ) -> None:
+        """Log a metric entry"""
+        await self.metrics_collection.insert_one(
+            metric.model_dump()
+        )
+    
+    async def get_metrics(
+        self,
+        user_id: str,
+        limit  : int = 100
+    ) -> List[MetricLog]:
+        """Get recent metrics for user"""
+        cursor = self.metrics_collection.find(
+            {"user_id": user_id}
+        ).sort("timestamp", -1).limit(limit)
+        
+        metrics = await cursor.to_list(length=limit)
+        return [MetricLog(**m) for m in metrics]
+    
+    async def get_metric(
+        self,
+        metric_id: str,
+        user_id  : str
+    ) -> Optional[MetricLog]:
+        """Get single metric by ID"""
+        metric = await self.metrics_collection.find_one({
+            "id"     : metric_id,
+            "user_id": user_id
+        })
+        if not metric:
+            return None
+        return MetricLog(**metric)
+    
+    async def update_metric_rating(
+        self,
+        metric_id: str,
+        user_id  : str,
+        rating   : int
+    ) -> bool:
+        """Update user rating"""
+        result = await self.metrics_collection.update_one(
+            {"id": metric_id, "user_id": user_id},
+            {"$set": {"user_rating": rating}}
+        )
+        return result.modified_count > 0
+
 

@@ -97,6 +97,12 @@ export default function Sidebar({
         ))}
       </div>
 
+      {/* ── Dashboard Link ──────────────────── */}
+      <a href="/dashboard" className="dashboard-link">
+        📊 View Dashboard
+      </a>
+
+
       {/* ── User Profile ────────────────────── */}
       <div className="user-profile">
         <div className="user-avatar">

@@ -953,3 +953,190 @@ body {
   color            : #f87171;
 }
 
+
+/* ── Dashboard ───────────────────────────────────── */
+.dashboard-container {
+  height : 100vh;
+  background : #0f0f0f;
+  padding    : 24px 32px;
+  overflow-y : auto;
+}
+
+.dashboard-header {
+  display         : flex;
+  justify-content : space-between;
+  align-items     : center;
+  margin-bottom   : 28px;
+  flex-wrap       : wrap;
+  gap             : 16px;
+}
+
+.dashboard-title {
+  font-size  : 26px;
+  font-weight: 700;
+  color      : #fff;
+}
+
+.dashboard-subtitle {
+  font-size : 14px;
+  color     : #888;
+  margin-top: 4px;
+}
+
+.dashboard-back-btn {
+  padding         : 10px 18px;
+  background-color: #1e1e1e;
+  border          : 1px solid #2a2a2a;
+  border-radius   : 8px;
+  color           : #fff;
+  text-decoration : none;
+  font-size       : 14px;
+  transition      : all 0.2s;
+}
+
+.dashboard-back-btn:hover {
+  background-color: #2a2a2a;
+  border-color    : #2563eb;
+}
+
+.stat-cards {
+  display              : grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap                  : 16px;
+  margin-bottom        : 24px;
+}
+
+.stat-card {
+  background-color: #1a1a1a;
+  border          : 1px solid #2a2a2a;
+  border-radius   : 12px;
+  padding         : 20px;
+  text-align      : center;
+}
+
+.stat-value {
+  font-size  : 32px;
+  font-weight: 700;
+  color      : #2563eb;
+}
+
+.stat-label {
+  font-size : 13px;
+  color     : #888;
+  margin-top: 6px;
+}
+
+.dashboard-charts {
+  display              : grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap                  : 16px;
+  margin-bottom        : 24px;
+}
+
+.chart-box, .chart-box-wide {
+  background-color: #1a1a1a;
+  border          : 1px solid #2a2a2a;
+  border-radius   : 12px;
+  padding         : 20px;
+}
+
+.chart-box-wide {
+  margin-bottom: 24px;
+}
+
+.chart-title {
+  font-size    : 15px;
+  font-weight  : 600;
+  color        : #fff;
+  margin-bottom: 16px;
+}
+
+.metrics-table-wrapper {
+  overflow-x: auto;
+}
+
+.metrics-table {
+  width          : 100%;
+  border-collapse: collapse;
+  font-size      : 13px;
+}
+
+.metrics-table th {
+  text-align    : left;
+  padding       : 10px 12px;
+  color         : #888;
+  border-bottom : 1px solid #2a2a2a;
+  font-weight   : 600;
+}
+
+.metrics-table td {
+  padding       : 10px 12px;
+  color         : #ddd;
+  border-bottom : 1px solid #1f1f1f;
+}
+
+.table-question {
+  color: #fff;
+}
+
+.level-tag {
+  font-size    : 11px;
+  padding      : 3px 8px;
+  border-radius: 12px;
+  font-weight  : 600;
+}
+
+.tag-beginner {
+  background-color: #064e3b;
+  color           : #34d399;
+}
+
+.tag-expert {
+  background-color: #1e1b4b;
+  color           : #818cf8;
+}
+
+.tag-offtopic {
+  background-color: #450a0a;
+  color           : #f87171;
+}
+
+.dashboard-empty {
+  display        : flex;
+  flex-direction : column;
+  align-items    : center;
+  justify-content: center;
+  height         : 100vh;
+  background     : #0f0f0f;
+  color          : #888;
+  gap            : 12px;
+}
+
+.dashboard-empty-icon {
+  font-size: 64px;
+}
+
+.dashboard-empty h1 {
+  color: #fff;
+}
+
+.dashboard-link {
+  display         : block;
+  text-align      : center;
+  padding         : 10px;
+  background-color: #1e1e1e;
+  border          : 1px solid #2a2a2a;
+  border-radius   : 8px;
+  color           : #888;
+  text-decoration : none;
+  font-size       : 13px;
+  transition      : all 0.2s;
+  margin-bottom   : 8px;
+}
+
+.dashboard-link:hover {
+  background-color: #2a2a2a;
+  border-color    : #2563eb;
+  color           : #fff;
+}
+

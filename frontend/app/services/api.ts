@@ -67,6 +67,12 @@ export const sendMessageStream = async (
     // Get auth token
 const token = getTokenFn ? await getTokenFn() : null
 
+// DEBUG - check token
+console.log("Stream token exists:", !!token)
+if (!token){
+  console.error("NO TOKEN for streaming request!")
+}
+
 const response = await fetch(
   `${API_BASE_URL}/api/chat/stream`,
   {
@@ -81,6 +87,8 @@ const response = await fetch(
     })
   }
 )
+
+console.log("Stream response status:", response.status)
 
 
 
@@ -299,6 +307,83 @@ export const deleteChatFromDB = async (chatId: string): Promise<boolean> => {
     return true
   } catch (error) {
     console.error("Error deleting chat:", error)
+    return false
+  }
+}
+
+
+// ─────────────────────────────────────────────────
+// DASHBOARD API
+// ─────────────────────────────────────────────────
+
+export interface DashboardStats {
+  total_queries       : number
+  off_topic_count     : number
+  off_topic_rate      : number
+  avg_latency_ms      : number
+  avg_retrieved_count : number
+  total_retries       : number
+  beginner_count      : number
+  expert_count        : number
+  positive_ratings    : number
+  negative_ratings    : number
+  avg_faithfulness    : number | null
+  avg_answer_relevancy: number | null
+}
+
+export interface MetricEntry {
+  id              : string
+  question        : string
+  answer          : string
+  latency_ms      : number
+  token_estimate  : number
+  user_level      : string
+  is_off_topic    : boolean
+  retrieved_count : number
+  retry_count     : number
+  user_rating     : number | null
+  timestamp       : string
+}
+
+// ── Get Dashboard Stats ───────────────────────────
+export const fetchDashboardStats = async (): Promise<DashboardStats | null> => {
+  try {
+    const response = await api.get<DashboardStats>("/api/dashboard/stats")
+    return response.data
+  } catch (error) {
+    console.error("Error fetching dashboard stats:", error)
+    return null
+  }
+}
+
+// ── Get Recent Metrics ────────────────────────────
+export const fetchMetrics = async (
+  limit: number = 50
+): Promise<MetricEntry[]> => {
+  try {
+    const response = await api.get<MetricEntry[]>(
+      `/api/dashboard/metrics?limit=${limit}`
+    )
+    return response.data
+  } catch (error) {
+    console.error("Error fetching metrics:", error)
+    return []
+  }
+}
+
+// ── Rate A Query ──────────────────────────────────
+export const rateQuery = async (
+  metricId: string,
+  rating  : number
+): Promise<boolean> => {
+  try {
+    await api.post("/api/dashboard/rate", {
+      metric_id: metricId,
+      rating   : rating
+    })
+    return true
+  } catch (error) {
+    console.error("Error rating query:", error)
     return false
   }
 }

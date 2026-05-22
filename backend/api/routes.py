@@ -1,5 +1,9 @@
 # api/routes.py
-from fastapi import APIRouter, HTTPException
+from database.metrics_crud import log_metric
+from database.metrics_models import MetricLog
+from auth.dependencies import get_current_user
+
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from api.schemas import (
     ChatRequest,
@@ -8,6 +12,8 @@ from api.schemas import (
     IngestResponse,
     HealthResponse
 )
+import time
+import uuid
 from src.graph import rag_graph
 from src.data_loader import ingest_documents
 from langchain_ollama import ChatOllama
@@ -135,12 +141,23 @@ async def chat(request: ChatRequest):
     "/chat/stream",
     tags=["Chat"]
 )
-async def chat_stream(request: ChatRequest):
+async def chat_stream(request: ChatRequest, user: dict = Depends(get_current_user)):
     """
     Streaming chat endpoint with memory!
     """
 
+    print(f"\n🔵 CHAT_STREAM ENDPOINT HIT! User: {user.get('uid', 'unknown')}")
+
     async def generate():
+        # ── Metric Tracking Variables ─────────────
+        start_time       = time.time()
+        metric_user_level= "BEGINNER"
+        metric_off_topic = False
+        metric_retrieved = 0
+        metric_retries   = 0
+        full_answer      = ""
+        retrieved_texts  = []
+
         try:
             print(f"\n{'='*50}")
             print(f"Streaming Question: {request.question}")
@@ -153,7 +170,6 @@ async def chat_stream(request: ChatRequest):
                 for msg in (request.chat_history or [])
             ]
 
-            # ── Format history for prompt ─────────
             formatted_history = format_chat_history(history)
 
             # ── Step 1: Check Topic ───────────────
@@ -165,6 +181,8 @@ async def chat_stream(request: ChatRequest):
             is_design = "YES" in topic_result.strip().upper()
 
             if not is_design:
+                metric_off_topic = True
+
                 rejection = """I'm specialized in interior design only! 🏠
 
 I cannot help with that topic. But I'd love to help you with:
@@ -178,11 +196,32 @@ I cannot help with that topic. But I'd love to help you with:
 
 What would you like to know about interior design?"""
 
+                full_answer = rejection
+
                 yield f"data: {json.dumps({'type': 'metadata', 'user_level': 'OFF_TOPIC'})}\n\n"
 
                 for word in rejection.split(" "):
                     yield f"data: {json.dumps({'type': 'token', 'content': word + ' '})}\n\n"
 
+                # ── Log Off-Topic Metric ──────────
+                latency = (time.time() - start_time) * 1000
+                metric = MetricLog(
+                    id              = str(uuid.uuid4()),
+                    user_id         = user["uid"],
+                    question        = request.question,
+                    answer          = full_answer,
+                    latency_ms      = round(latency, 2),
+                    token_estimate  = len(full_answer.split()),
+                    user_level      = "OFF_TOPIC",
+                    is_off_topic    = True,
+                    retrieved_count = 0,
+                    retry_count     = 0,
+                    retrieved_contexts = []
+                )
+                await log_metric(metric)
+
+                # Send metric_id so frontend can rate
+                yield f"data: {json.dumps({'type': 'metric', 'metric_id': metric.id})}\n\n"
                 yield f"data: {json.dumps({'type': 'done'})}\n\n"
                 return
 
@@ -195,11 +234,14 @@ What would you like to know about interior design?"""
             user_level = "EXPERT" if "EXPERT" in \
                 classify_result.strip().upper() \
                 else "BEGINNER"
+            metric_user_level = user_level
 
             print(f"--- User Level: {user_level} ---")
 
             # ── Step 3: Retrieve Documents ────────
             documents = _get_retriever().invoke(request.question)
+            metric_retrieved = len(documents)
+            retrieved_texts  = [doc.page_content for doc in documents]
             print(f"--- Retrieved {len(documents)} docs ---")
 
             # ── Step 4: Build Context ─────────────
@@ -215,26 +257,52 @@ What would you like to know about interior design?"""
             # ── Step 6: Send Metadata ─────────────
             yield f"data: {json.dumps({'type': 'metadata', 'user_level': user_level})}\n\n"
 
-            # ── Step 7: Stream Answer With Memory ──
+            # ── Step 7: Stream Answer ─────────────
             print("--- Streaming Answer With Memory ---")
             stream_chain = prompt | streaming_llm
 
             async for chunk in stream_chain.astream({
                 "question"    : request.question,
                 "context"     : context,
-                "chat_history": formatted_history  # ← Memory!
+                "chat_history": formatted_history
             }):
                 if chunk.content:
+                    full_answer += chunk.content
                     yield f"data: {json.dumps({'type': 'token', 'content': chunk.content})}\n\n"
 
-            # ── Step 8: Done ──────────────────────
+            # ── Step 8: Log Metric ────────────────
+            latency = (time.time() - start_time) * 1000
+            metric = MetricLog(
+                id                = str(uuid.uuid4()),
+                user_id           = user["uid"],
+                question          = request.question,
+                answer            = full_answer,
+                latency_ms        = round(latency, 2),
+                token_estimate    = len(full_answer.split()),
+                user_level        = metric_user_level,
+                is_off_topic      = False,
+                retrieved_count   = metric_retrieved,
+                retry_count       = metric_retries,
+                retrieved_contexts= retrieved_texts
+            )
+            await log_metric(metric)
+            print(f"--- Metric logged: {metric.id} ---")
+
+            # Send metric_id to frontend
+            yield f"data: {json.dumps({'type': 'metric', 'metric_id': metric.id})}\n\n"
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
             print("--- Stream Complete ---")
 
         except Exception as e:
-            print(f"Stream Error: {str(e)}")
+            import traceback
+            print(f"\n{'!'*50}")
+            print(f"STREAM ERROR: {str(e)}")
+            print(f"ERROR TYPE: {type(e).__name__}")
+            print("FULL TRACEBACK:")
+            traceback.print_exc()
+            print(f"{'!'*50}\n")
             yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
-
+    
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
@@ -244,6 +312,10 @@ What would you like to know about interior design?"""
             "Access-Control-Allow-Origin": "*"
         }
     )
+
+
+
+
 
 # ─────────────────────────────────────────────────
 # ROUTE 4 - Ingest Documents

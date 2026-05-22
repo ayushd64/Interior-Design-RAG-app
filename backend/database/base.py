@@ -1,6 +1,7 @@
 # database/base.py
 from abc import ABC, abstractmethod
 from typing import List, Optional
+from database.metrics_models import MetricLog
 from database.models import (
     ChatModel,
     MessageModel,
@@ -83,4 +84,42 @@ class DatabaseRepository(ABC):
     ) -> int:
         """Delete all chats for specific user"""
         pass
+
+    # ── Metrics Operations ────────────────────────
+    @abstractmethod
+    async def log_metric(
+        self,
+        metric: "MetricLog"
+    ) -> None:
+        """Log a metric entry"""
+        pass
+    
+    @abstractmethod
+    async def get_metrics(
+        self,
+        user_id: str,
+        limit  : int = 100
+    ) -> List["MetricLog"]:
+        """Get recent metrics for user"""
+        pass
+    
+    @abstractmethod
+    async def get_metric(
+        self,
+        metric_id: str,
+        user_id  : str
+    ) -> Optional["MetricLog"]:
+        """Get single metric by ID"""
+        pass
+    
+    @abstractmethod
+    async def update_metric_rating(
+        self,
+        metric_id: str,
+        user_id  : str,
+        rating   : int
+    ) -> bool:
+        """Update user rating for a metric"""
+        pass
+
 

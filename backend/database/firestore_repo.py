@@ -3,6 +3,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from typing import List, Optional
 from datetime import datetime
+from database.metrics_models import MetricLog
 from database.base import DatabaseRepository
 from database.models import (
     ChatModel,
@@ -25,6 +26,7 @@ class FirestoreRepository(DatabaseRepository):
             "FIRESTORE_COLLECTION_NAME",
             "chats"
         )
+        self.metrics_collection_name = "metrics"
         self.credentials_path = os.getenv(
             "FIREBASE_CREDENTIALS_PATH",
             "./firebase-credentials.json"
@@ -248,4 +250,108 @@ class FirestoreRepository(DatabaseRepository):
             )
             count += 1
         return count
+    
+
+    # ── Metrics Operations ────────────────────────
+    async def log_metric(
+        self,
+        metric: MetricLog
+    ) -> None:
+        """Log a metric entry"""
+        loop = asyncio.get_event_loop()
+        doc_ref = self.db.collection(
+            self.metrics_collection_name
+        ).document(metric.id)
+        
+        await loop.run_in_executor(
+            None,
+            lambda: doc_ref.set(metric.model_dump())
+        )
+    
+    async def get_metrics(
+        self,
+        user_id: str,
+        limit  : int = 100
+    ) -> List[MetricLog]:
+        """Get recent metrics for user"""
+        loop = asyncio.get_event_loop()
+        
+        docs = await loop.run_in_executor(
+            None,
+            lambda: list(
+                self.db.collection(self.metrics_collection_name)
+                .where("user_id", "==", user_id)
+                .order_by(
+                    "timestamp",
+                    direction=firestore.Query.DESCENDING
+                )
+                .limit(limit)
+                .stream()
+            )
+        )
+        
+        metrics = []
+        for doc in docs:
+            try:
+                data = doc.to_dict()
+                if isinstance(data.get("timestamp"), str):
+                    data["timestamp"] = datetime.fromisoformat(
+                        data["timestamp"]
+                    )
+                metrics.append(MetricLog(**data))
+            except Exception as e:
+                print(f"⚠️ Error parsing metric: {e}")
+                continue
+        return metrics
+    
+    async def get_metric(
+        self,
+        metric_id: str,
+        user_id  : str
+    ) -> Optional[MetricLog]:
+        """Get single metric by ID"""
+        loop = asyncio.get_event_loop()
+        doc = await loop.run_in_executor(
+            None,
+            lambda: self.db.collection(
+                self.metrics_collection_name
+            ).document(metric_id).get()
+        )
+        
+        if not doc.exists:
+            return None
+        
+        data = doc.to_dict()
+        if data.get("user_id") != user_id:
+            return None
+        
+        if isinstance(data.get("timestamp"), str):
+            data["timestamp"] = datetime.fromisoformat(
+                data["timestamp"]
+            )
+        return MetricLog(**data)
+    
+    async def update_metric_rating(
+        self,
+        metric_id: str,
+        user_id  : str,
+        rating   : int
+    ) -> bool:
+        """Update user rating"""
+        existing = await self.get_metric(metric_id, user_id)
+        if not existing:
+            return False
+        
+        loop = asyncio.get_event_loop()
+        doc_ref = self.db.collection(
+            self.metrics_collection_name
+        ).document(metric_id)
+        
+        await loop.run_in_executor(
+            None,
+            lambda: doc_ref.update({"user_rating": rating})
+        )
+        return True
+
+
 
