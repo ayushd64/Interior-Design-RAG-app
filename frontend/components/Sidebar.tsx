@@ -3,6 +3,7 @@
 
 import { User } from "firebase/auth"
 import { Chat } from "../app/types"
+import { useTheme } from "../app/context/ThemeContext"
 
 interface SidebarProps {
   chats         : Chat[]
@@ -23,6 +24,8 @@ export default function Sidebar({
   user,
   onSignOut
 }: SidebarProps) {
+
+  const { theme, toggleTheme } = useTheme()
 
   // ── Get User Display Info ─────────────────────
   const displayName  = user?.displayName || "User"
@@ -96,6 +99,12 @@ export default function Sidebar({
           </div>
         ))}
       </div>
+
+      {/* ── Theme Toggle ────────────────────── */} 
+      <button onClick={toggleTheme} className="theme-toggle"> 
+        {theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"} 
+      </button> 
+
 
       {/* ── Dashboard Link ──────────────────── */}
       <a href="/dashboard" className="dashboard-link">
