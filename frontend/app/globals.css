@@ -906,9 +906,9 @@ body {
   align-items      : center;
   gap              : 10px;
   padding          : 12px 10px;
-  background-color : #1e1e1e;
+  background-color : var(--bg-tertiary);
   border-radius    : 10px;
-  border           : 1px solid #2a2a2a;
+  border           : 1px solid var(--border);
   margin-top       : auto;
 }
 
@@ -916,7 +916,7 @@ body {
   width            : 36px;
   height           : 36px;
   border-radius    : 50%;
-  background-color : #2563eb;
+  background-color : var(--accent);
   color            : #ffffff;
   display          : flex;
   align-items      : center;
@@ -941,7 +941,7 @@ body {
 .user-name {
   font-size      : 13px;
   font-weight    : 600;
-  color          : #ffffff;
+  color          : var(--text-primary);
   overflow       : hidden;
   text-overflow  : ellipsis;
   white-space    : nowrap;
@@ -949,7 +949,7 @@ body {
 
 .user-email {
   font-size      : 11px;
-  color          : #888;
+  color          : var(--text-secondary);
   overflow       : hidden;
   text-overflow  : ellipsis;
   white-space    : nowrap;
@@ -957,8 +957,8 @@ body {
 
 .signout-btn {
   background    : none;
-  border        : 1px solid #333;
-  color         : #888;
+  border        : 1px solid var(--border);
+  color         : var(--text-secondary);
   width         : 32px;
   height        : 32px;
   border-radius : 8px;
@@ -969,9 +969,9 @@ body {
 }
 
 .signout-btn:hover {
-  background-color : #2a1a1a;
-  border-color     : #f87171;
-  color            : #f87171;
+  background-color : var(--accent-light);
+  border-color     : var(--accent);
+  color            : var(--accent-dark);
 }
 
 /* ── Dashboard ───────────────────────────────────── */
