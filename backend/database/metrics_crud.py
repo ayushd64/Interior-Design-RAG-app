@@ -31,3 +31,11 @@ async def update_metric_rating(
         metric_id, user_id, rating
     )
 
+
+async def update_metric_scores(
+    metric_id: str,
+    scores   : dict
+) -> bool:
+    db = get_database()
+    return await db.update_metric_scores(metric_id, scores)
+

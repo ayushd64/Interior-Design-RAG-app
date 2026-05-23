@@ -9,8 +9,11 @@ from database.metrics_models import (
     RatingRequest,
     MetricLog
 )
+from database.metrics_crud import update_metric_scores
+from src.evaluator import evaluate_single
 from auth.dependencies import get_current_user
 from typing import List
+
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -65,6 +68,11 @@ async def get_dashboard_stats(
         if m.answer_relevancy is not None
     ]
 
+    prec_scores = [
+        m.context_precision for m in metrics 
+        if m.context_precision is not None
+    ]
+
     return DashboardStats(
         total_queries       = total,
         off_topic_count     = off_topic,
@@ -83,6 +91,10 @@ async def get_dashboard_stats(
         avg_answer_relevancy= (
             round(sum(rel_scores) / len(rel_scores), 2)
             if rel_scores else None
+        ),
+        avg_context_precision= (
+            round(sum(prec_scores) / len(prec_scores), 2)
+            if prec_scores else None
         )
     )
 
@@ -113,4 +125,69 @@ async def rate_query(
             detail="Metric not found"
         )
     return {"success": True}
+
+
+# ── Evaluate All Unscored Metrics ─────────────────
+@router.post("/evaluate")
+async def evaluate_unscored(
+    user: dict = Depends(get_current_user)
+):
+    """
+    Run LLM-judge evaluation on all unscored metrics
+    Scores: faithfulness, relevancy, context precision
+    """
+    metrics = await get_metrics(user["uid"], limit=1000)
+    
+    # Find metrics that need scoring
+    # (have context, not off-topic, not yet scored)
+    unscored = [
+        m for m in metrics
+        if not m.is_off_topic
+        and m.retrieved_contexts
+        and m.faithfulness is None
+    ]
+    
+    if not unscored:
+        return {
+            "success"  : True,
+            "evaluated": 0,
+            "message"  : "No unscored queries to evaluate!"
+        }
+    
+    print(f"\n{'='*50}")
+    print(f"🔬 Evaluating {len(unscored)} queries...")
+    print(f"{'='*50}\n")
+    
+    evaluated_count = 0
+    
+    for i, metric in enumerate(unscored):
+        print(f"--- Evaluating {i+1}/{len(unscored)}: {metric.question[:40]}... ---")
+        
+        try:
+            scores = evaluate_single(
+                question = metric.question,
+                answer   = metric.answer,
+                contexts = metric.retrieved_contexts
+            )
+            
+            await update_metric_scores(metric.id, scores)
+            evaluated_count += 1
+            
+            print(f"    Faithfulness: {scores['faithfulness']}, "
+                  f"Relevancy: {scores['answer_relevancy']}, "
+                  f"Precision: {scores['context_precision']}")
+            
+        except Exception as e:
+            print(f"    ⚠️ Failed to evaluate: {e}")
+            continue
+    
+    print(f"\n✅ Evaluated {evaluated_count} queries!\n")
+    
+    return {
+        "success"  : True,
+        "evaluated": evaluated_count,
+        "message"  : f"Evaluated {evaluated_count} queries!"
+    }
+
+
 

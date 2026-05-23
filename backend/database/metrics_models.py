@@ -63,6 +63,7 @@ class DashboardStats(BaseModel):
     # ── RAGAS Averages (if available) ─────────────
     avg_faithfulness    : Optional[float] = None
     avg_answer_relevancy: Optional[float] = None
+    avg_context_precision: Optional[float] = None
 
 # ─────────────────────────────────────────────────
 # Rating Request

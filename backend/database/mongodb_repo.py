@@ -213,4 +213,20 @@ class MongoDBRepository(DatabaseRepository):
         )
         return result.modified_count > 0
 
+    async def update_metric_scores(
+        self,
+        metric_id: str,
+        scores   : dict
+    ) -> bool:
+        """Update evaluation scores"""
+        result = await self.metrics_collection.update_one(
+            {"id": metric_id},
+            {"$set": {
+                "faithfulness"     : scores.get("faithfulness"),
+                "answer_relevancy" : scores.get("answer_relevancy"),
+                "context_precision": scores.get("context_precision")
+            }}
+        )
+        return result.modified_count > 0
+
 

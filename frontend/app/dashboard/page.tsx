@@ -1,6 +1,5 @@
 // app/dashboard/page.tsx
 "use client"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -16,7 +15,8 @@ import {
   fetchDashboardStats,
   fetchMetrics,
   DashboardStats,
-  MetricEntry
+  MetricEntry,
+  evaluateMetrics,
 } from "../services/api"
 
 export default function DashboardPage() {
@@ -26,6 +26,10 @@ export default function DashboardPage() {
   const [stats, setStats]       = useState<DashboardStats | null>(null)
   const [metrics, setMetrics]   = useState<MetricEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isEvaluating, setIsEvaluating] = useState(false)
+  const [evalMessage, setEvalMessage]   = useState("")
+
+
 
   // ── Wire auth token ───────────────────────────
   useEffect(() => {
@@ -100,6 +104,33 @@ export default function DashboardPage() {
       latency: Math.round(m.latency_ms)
     }))
 
+  // ── Run Evaluation ────────────────────────────
+  const handleEvaluate = async () => {
+    setIsEvaluating(true)
+    setEvalMessage("Evaluating... this may take a few minutes ⏳")
+
+    const result = await evaluateMetrics()
+
+    if (result) {
+      setEvalMessage(`✅ ${result.message}`)
+      // Reload stats to show new scores
+      const [statsData, metricsData] = await Promise.all([
+        fetchDashboardStats(),
+        fetchMetrics(50)
+      ])
+      setStats(statsData)
+      setMetrics(metricsData)
+    } else {
+      setEvalMessage("❌ Evaluation failed. Check backend logs.")
+    }
+
+    setIsEvaluating(false)
+    // Clear message after 5 seconds
+    setTimeout(() => setEvalMessage(""), 5000)
+  }
+
+
+
   return (
     <div className="dashboard-container">
 
@@ -111,10 +142,28 @@ export default function DashboardPage() {
             Performance metrics for your interior design assistant
           </p>
         </div>
-        <Link href="/" className="dashboard-back-btn">
-          ← Back to Chat
-        </Link>
+        <div className="dashboard-header-actions">
+          <button
+            onClick={handleEvaluate}
+            disabled={isEvaluating}
+            className="evaluate-btn"
+          >
+            {isEvaluating ? "⏳ Evaluating..." : "🔬 Evaluate Quality"}
+          </button>
+          <Link href="/" className="dashboard-back-btn">
+            ← Back to Chat
+          </Link>
+        </div>
       </div>
+
+      {/* ── Eval Message ──────────────────────── */}
+      {evalMessage && (
+        <div className="eval-message">
+          {evalMessage}
+        </div>
+      )}
+
+
 
       {/* ── Stat Cards ────────────────────────── */}
       <div className="stat-cards">
@@ -135,6 +184,47 @@ export default function DashboardPage() {
           <div className="stat-label">Avg Docs Retrieved</div>
         </div>
       </div>
+
+
+      {/* ── RAGAS Quality Scores ──────────────── */}
+      {(stats.avg_faithfulness !== null ||
+        stats.avg_answer_relevancy !== null ||
+        stats.avg_context_precision !== null) && (
+        <div className="quality-section">
+          <h2 className="quality-heading">🔬 RAG Quality Scores</h2>
+          <div className="quality-cards">
+            <div className="quality-card">
+              <div className="quality-value">
+                {stats.avg_faithfulness !== null
+                  ? `${(stats.avg_faithfulness * 100).toFixed(0)}%`
+                  : "—"}
+              </div>
+              <div className="quality-label">Faithfulness</div>
+              <div className="quality-desc">Answer grounded in docs</div>
+            </div>
+            <div className="quality-card">
+              <div className="quality-value">
+                {stats.avg_answer_relevancy !== null
+                  ? `${(stats.avg_answer_relevancy * 100).toFixed(0)}%`
+                  : "—"}
+              </div>
+              <div className="quality-label">Answer Relevancy</div>
+              <div className="quality-desc">Addresses the question</div>
+            </div>
+            <div className="quality-card">
+              <div className="quality-value">
+                {stats.avg_context_precision !== null
+                  ? `${(stats.avg_context_precision * 100).toFixed(0)}%`
+                  : "—"}
+              </div>
+              <div className="quality-label">Context Precision</div>
+              <div className="quality-desc">Retrieved docs relevant</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+
 
       {/* ── Charts Row ────────────────────────── */}
       <div className="dashboard-charts">

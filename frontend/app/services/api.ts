@@ -329,6 +329,7 @@ export interface DashboardStats {
   negative_ratings    : number
   avg_faithfulness    : number | null
   avg_answer_relevancy: number | null
+  avg_context_precision: number | null
 }
 
 export interface MetricEntry {
@@ -385,6 +386,28 @@ export const rateQuery = async (
   } catch (error) {
     console.error("Error rating query:", error)
     return false
+  }
+}
+
+// ── Evaluate Unscored Metrics ─────────────────────
+export interface EvaluateResult {
+  success  : boolean
+  evaluated: number
+  message  : string
+}
+
+export const evaluateMetrics = async (): Promise<EvaluateResult | null> => {
+  try {
+    // Long timeout - evaluation is slow!
+    const response = await api.post<EvaluateResult>(
+      "/api/dashboard/evaluate",
+      {},
+      { timeout: 600000 }  // 10 minutes
+    )
+    return response.data
+  } catch (error) {
+    console.error("Error evaluating metrics:", error)
+    return null
   }
 }
 

@@ -353,5 +353,28 @@ class FirestoreRepository(DatabaseRepository):
         )
         return True
 
+    async def update_metric_scores(
+        self,
+        metric_id: str,
+        scores   : dict
+    ) -> bool:
+        """Update evaluation scores"""
+        loop = asyncio.get_event_loop()
+        doc_ref = self.db.collection(
+            self.metrics_collection_name
+        ).document(metric_id)
+        
+        await loop.run_in_executor(
+            None,
+            lambda: doc_ref.update({
+                "faithfulness"     : scores.get("faithfulness"),
+                "answer_relevancy" : scores.get("answer_relevancy"),
+                "context_precision": scores.get("context_precision")
+            })
+        )
+        return True
+
+
+
 
 

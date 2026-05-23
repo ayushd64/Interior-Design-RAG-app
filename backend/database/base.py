@@ -122,4 +122,15 @@ class DatabaseRepository(ABC):
         """Update user rating for a metric"""
         pass
 
+    @abstractmethod
+    async def update_metric_scores(
+        self,
+        metric_id: str,
+        scores   : dict
+    ) -> bool:
+        """Update RAGAS scores for a metric"""
+        pass
+
+
+
 

@@ -1140,3 +1140,87 @@ body {
   color           : #fff;
 }
 
+/* ── Dashboard Header Actions ────────────────────── */
+.dashboard-header-actions {
+  display     : flex;
+  gap         : 12px;
+  align-items : center;
+}
+
+.evaluate-btn {
+  padding         : 10px 18px;
+  background-color: #8b5cf6;
+  border          : none;
+  border-radius   : 8px;
+  color           : #fff;
+  font-size       : 14px;
+  font-weight     : 600;
+  cursor          : pointer;
+  transition      : all 0.2s;
+}
+
+.evaluate-btn:hover:not(:disabled) {
+  background-color: #7c3aed;
+}
+
+.evaluate-btn:disabled {
+  opacity: 0.5;
+  cursor : not-allowed;
+}
+
+.eval-message {
+  background-color: #1e1b4b;
+  border          : 1px solid #4c1d95;
+  color           : #c4b5fd;
+  padding         : 12px 16px;
+  border-radius   : 8px;
+  margin-bottom   : 20px;
+  font-size       : 14px;
+  text-align      : center;
+}
+
+/* ── Quality Scores Section ──────────────────────── */
+.quality-section {
+  margin-bottom: 24px;
+}
+
+.quality-heading {
+  font-size    : 18px;
+  font-weight  : 700;
+  color        : #fff;
+  margin-bottom: 16px;
+}
+
+.quality-cards {
+  display              : grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap                  : 16px;
+}
+
+.quality-card {
+  background      : linear-gradient(135deg, #1a1a2e 0%, #1a1a1a 100%);
+  border          : 1px solid #4c1d95;
+  border-radius   : 12px;
+  padding         : 24px;
+  text-align      : center;
+}
+
+.quality-value {
+  font-size  : 36px;
+  font-weight: 700;
+  color      : #a78bfa;
+}
+
+.quality-label {
+  font-size  : 15px;
+  font-weight: 600;
+  color      : #fff;
+  margin-top : 8px;
+}
+
+.quality-desc {
+  font-size : 12px;
+  color     : #888;
+  margin-top: 4px;
+}
+
