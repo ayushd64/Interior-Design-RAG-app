@@ -22,7 +22,8 @@ from src.prompts import (
     BEGINNER_PROMPT,
     EXPERT_PROMPT,
     TOPIC_GUARD_PROMPT,
-    CLASSIFY_PROMPT
+    CLASSIFY_PROMPT,
+    TRIAGE_PROMPT
 )
 from src.vectorstore import get_retriever
 from src.nodes import format_chat_history
@@ -172,14 +173,21 @@ async def chat_stream(request: ChatRequest, user: dict = Depends(get_current_use
 
             formatted_history = format_chat_history(history)
 
-            # ── Step 1: Check Topic ───────────────
-            topic_chain  = TOPIC_GUARD_PROMPT | streaming_llm | parser
-            topic_result = topic_chain.invoke({
+            # ── Step 1+2 MERGED: Triage (1 call!) ─
+            triage_chain  = TRIAGE_PROMPT | streaming_llm | parser
+            triage_result = triage_chain.invoke({
                 "question": request.question
             })
 
-            is_design = "YES" in topic_result.strip().upper()
+            print(f"--- Triage result: {triage_result.strip()} ---")
 
+            # Parse both values from the response
+            result_upper = triage_result.strip().upper()
+            is_design  = "TOPIC: YES" in result_upper
+            user_level = "EXPERT" if "LEVEL: EXPERT" in result_upper \
+                         else "BEGINNER"
+
+            # ── Handle off-topic ──────────────────
             if not is_design:
                 metric_off_topic = True
 
@@ -220,23 +228,15 @@ What would you like to know about interior design?"""
                 )
                 await log_metric(metric)
 
-                # Send metric_id so frontend can rate
                 yield f"data: {json.dumps({'type': 'metric', 'metric_id': metric.id})}\n\n"
                 yield f"data: {json.dumps({'type': 'done'})}\n\n"
                 return
 
-            # ── Step 2: Classify User ─────────────
-            classify_chain  = CLASSIFY_PROMPT | streaming_llm | parser
-            classify_result = classify_chain.invoke({
-                "question": request.question
-            })
-
-            user_level = "EXPERT" if "EXPERT" in \
-                classify_result.strip().upper() \
-                else "BEGINNER"
+            # ── User level set from triage ────────
             metric_user_level = user_level
-
             print(f"--- User Level: {user_level} ---")
+
+
 
             # ── Step 3: Retrieve Documents ────────
             documents = _get_retriever().invoke(request.question)

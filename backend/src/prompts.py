@@ -199,3 +199,48 @@ REPHRASE_PROMPT = ChatPromptTemplate.from_messages([
 
     Rephrased question:""")
 ])
+
+
+# ─────────────────────────────────────────────────
+# MERGED: Topic Guard + Classification (1 call!)
+# ─────────────────────────────────────────────────
+from langchain_core.prompts import ChatPromptTemplate
+
+TRIAGE_PROMPT = ChatPromptTemplate.from_messages([
+    ("system", """You analyze interior design questions.
+
+Do TWO things and respond in EXACTLY this format:
+
+TOPIC: <YES or NO>
+LEVEL: <BEGINNER or EXPERT>
+
+Rules:
+- TOPIC is YES if the question is about interior 
+  design, decoration, furniture, color schemes, 
+  lighting, space planning, design styles, or home 
+  aesthetics. Otherwise NO.
+- LEVEL is EXPERT if the question uses technical 
+  terms, references specific design movements, or 
+  asks about advanced concepts. Otherwise BEGINNER.
+- If TOPIC is NO, still output LEVEL: BEGINNER.
+
+Respond with ONLY those two lines. No other text.
+
+Example 1:
+Question: How do I make my room cozy?
+TOPIC: YES
+LEVEL: BEGINNER
+
+Example 2:
+Question: Explain the principles of biophilic design
+TOPIC: YES
+LEVEL: EXPERT
+
+Example 3:
+Question: How do fighter jets work?
+TOPIC: NO
+LEVEL: BEGINNER
+"""),
+    ("human", "Question: {question}")
+])
+
