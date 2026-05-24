@@ -10,6 +10,7 @@ import { useAuth } from "./context/AuthContext"
 import { Chat, Message, HistoryMessage } from "./types"
 import {
   sendMessageStream,
+  sendAgentMessageStream,
   fetchAllChats,
   createChatInDB,
   updateChatTitle,
@@ -29,6 +30,7 @@ function HomeContent() {
   const [isLoading, setIsLoading]         = useState(false)
   const [streamingId, setStreamingId]     = useState<string | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
+  const [agentMode, setAgentMode]         = useState(false) // New state for agent mode
 
   // ── Load Chats From DB On Mount ───────────────
   useEffect(() => {
@@ -160,95 +162,125 @@ function HomeContent() {
 
     let finalContent = ""
     let finalUserLevel = ""
+    let finalImageUrl = ""
 
-    await sendMessageStream(
-      question,
-      history,
+    // ── Shared Callbacks (used by both modes) ─────
+    const handleToken = (token: string) => {
+      finalContent += token
+      setChats(prev => prev.map(chat =>
+        chat.id === chatId
+          ? {
+              ...chat,
+              messages: chat.messages.map(msg =>
+                msg.id === assistantId
+                  ? { ...msg, content: msg.content + token }
+                  : msg
+              )
+            }
+          : chat
+      ))
+    }
 
-      (token: string) => {
-        finalContent += token
-        setChats(prev => prev.map(chat =>
-          chat.id === chatId
-            ? {
-                ...chat,
-                messages: chat.messages.map(msg =>
-                  msg.id === assistantId
-                    ? { ...msg, content: msg.content + token }
-                    : msg
-                )
-              }
-            : chat
-        ))
-      },
+    const handleComplete = async () => {
+      setIsLoading(false)
+      setStreamingId(null)
 
-      (userLevel: string) => {
-        finalUserLevel = userLevel
-        setChats(prev => prev.map(chat =>
-          chat.id === chatId
-            ? {
-                ...chat,
-                messages: chat.messages.map(msg =>
-                  msg.id === assistantId
-                    ? { ...msg, user_level: userLevel }
-                    : msg
-                )
-              }
-            : chat
-        ))
-      },
-
-      async () => {
-        setIsLoading(false)
-        setStreamingId(null)
-        
-        const completeMessage: Message = {
-          id        : assistantId,
-          role      : "assistant",
-          content   : finalContent,
-          user_level: finalUserLevel,
-          timestamp : new Date()
-        }
-        
-        await addMessageToDB(chatId!, completeMessage)
-        console.log("Message saved!")
-      },
-
-      async (error: string) => {
-        console.error("Stream error:", error)
-        
-        const errorContent = "Sorry! Something went wrong. Please try again."
-        
-        setChats(prev => prev.map(chat =>
-          chat.id === chatId
-            ? {
-                ...chat,
-                messages: chat.messages.map(msg =>
-                  msg.id === assistantId
-                    ? {
-                        ...msg,
-                        content: errorContent
-                      }
-                    : msg
-                )
-              }
-            : chat
-        ))
-        
-        const errorMessage: Message = {
-          id        : assistantId,
-          role      : "assistant",
-          content   : errorContent,
-          timestamp : new Date()
-        }
-        
-        await addMessageToDB(chatId!, errorMessage)
-        
-        setIsLoading(false)
-        setStreamingId(null)
+      const completeMessage: Message = {
+        id        : assistantId,
+        role      : "assistant",
+        content   : finalContent,
+        user_level: finalUserLevel || undefined,
+        imageUrl  : finalImageUrl || undefined,
+        timestamp : new Date()
       }
-    )
 
-  }, [currentChatId, chats, buildHistory])
+      await addMessageToDB(chatId!, completeMessage)
+      console.log("Message saved!")
+    }
+
+    const handleError = async (error: string) => {
+      console.error("Stream error:", error)
+      const errorContent = "Sorry! Something went wrong. Please try again."
+
+      setChats(prev => prev.map(chat =>
+        chat.id === chatId
+          ? {
+              ...chat,
+              messages: chat.messages.map(msg =>
+                msg.id === assistantId
+                  ? { ...msg, content: errorContent }
+                  : msg
+              )
+            }
+          : chat
+      ))
+
+      const errorMessage: Message = {
+        id        : assistantId,
+        role      : "assistant",
+        content   : errorContent,
+        timestamp : new Date()
+      }
+      await addMessageToDB(chatId!, errorMessage)
+
+      setIsLoading(false)
+      setStreamingId(null)
+    }
+
+    // ── Branch: Agent Mode vs Classic Mode ────────
+    if (agentMode) {
+      // AGENT MODE — uses tools, can return images!
+      await sendAgentMessageStream(
+        question,
+        history,
+        handleToken,
+        // onImage callback — saves image URL to message
+        (url: string) => {
+          finalImageUrl = url
+          setChats(prev => prev.map(chat =>
+            chat.id === chatId
+              ? {
+                  ...chat,
+                  messages: chat.messages.map(msg =>
+                    msg.id === assistantId
+                      ? { ...msg, imageUrl: url }
+                      : msg
+                  )
+                }
+              : chat
+          ))
+        },
+        handleComplete,
+        handleError
+      )
+    } else {
+      // CLASSIC MODE — your original pipeline
+      await sendMessageStream(
+        question,
+        history,
+        handleToken,
+        // onUserLevel callback
+        (userLevel: string) => {
+          finalUserLevel = userLevel
+          setChats(prev => prev.map(chat =>
+            chat.id === chatId
+              ? {
+                  ...chat,
+                  messages: chat.messages.map(msg =>
+                    msg.id === assistantId
+                      ? { ...msg, user_level: userLevel }
+                      : msg
+                  )
+                }
+              : chat
+          ))
+        },
+        handleComplete,
+        handleError
+      )
+    }
+
+  }, [currentChatId, chats, buildHistory, agentMode])
 
   // ── Loading State ─────────────────────────────
   if (!isInitialized) {
@@ -281,14 +313,26 @@ function HomeContent() {
               Interior Design Assistant
             </div>
             <div className="chat-header-subtitle">
-              Ask anything about interior design
+              {agentMode
+                ? "🤖 Agent mode — can search & generate images"
+                : "Ask anything about interior design"}
             </div>
           </div>
-          <div className="status-indicator">
-            <div className="status-dot"></div>
-            <span>AI Online</span>
+          <div className="header-right">
+            <button
+              onClick={() => setAgentMode(!agentMode)}
+              className={`mode-toggle ${agentMode ? "mode-toggle-active" : ""}`}
+            >
+              {agentMode ? "🤖 Agent" : "💬 Classic"}
+            </button>
+            <div className="status-indicator">
+              <div className="status-dot"></div>
+              <span>AI Online</span>
+            </div>
           </div>
         </div>
+
+
 
         <ChatWindow
           messages={messages}

@@ -54,6 +54,82 @@ export const sendMessage = async (
   return response.data
 }
 
+// ─────────────────────────────────────────────────
+// AGENT STREAMING (with image support!)
+// ─────────────────────────────────────────────────
+export const sendAgentMessageStream = async (
+  question     : string,
+  chat_history : HistoryMessage[],
+  onToken      : (token: string) => void,
+  onImage      : (url: string) => void,
+  onComplete   : () => void,
+  onError      : (error: string) => void
+) => {
+  try {
+    const token = getTokenFn ? await getTokenFn() : null
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/agent/stream`,
+      {
+        method : "POST",
+        headers: {
+          "Content-Type" : "application/json",
+          "Authorization": token ? `Bearer ${token}` : ""
+        },
+        body   : JSON.stringify({ question, chat_history })
+      }
+    )
+
+    if (!response.body) {
+      onError("No response body")
+      return
+    }
+
+    const reader  = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ""
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split("\n\n")
+      buffer = lines.pop() || ""
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue
+
+        const data = line.slice(6)
+
+        try {
+          const parsed = JSON.parse(data)
+
+          if (parsed.type === "token") {
+            onToken(parsed.content)
+          } else if (parsed.type === "image") {
+            onImage(parsed.url)          // ← NEW! Image handling
+          } else if (parsed.type === "done") {
+            onComplete()
+          } else if (parsed.type === "error") {
+            onError(parsed.content)
+          }
+        } catch {
+          // skip malformed lines
+        }
+      }
+    }
+
+    onComplete()
+
+  } catch (error: any) {
+    console.error("Agent stream error:", error)
+    onError(error.message || "Agent request failed")
+  }
+}
+
+
+
 // ── Streaming Chat API ────────────────────────────
 export const sendMessageStream = async (
   question    : string,

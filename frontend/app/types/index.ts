@@ -5,6 +5,7 @@ export interface Message {
   role      : "user" | "assistant"
   content   : string
   user_level?: string
+  imageUrl? : string
   timestamp : Date
 }
 

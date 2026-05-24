@@ -77,10 +77,22 @@ export default function MessageBubble({
             <p>{message.content}</p>
           ) : (
             <>
+              {/* ── Generated Image ──────────────── */}
+              {message.imageUrl && (
+                <div className="message-image-wrapper">
+                  <img
+                    src={message.imageUrl}
+                    alt="Generated interior design"
+                    className="message-image"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+              )}
+
               <ReactMarkdown>
                 {message.content}
               </ReactMarkdown>
-              {/* ── Streaming Cursor ────────────── */}
+              {/* ── Streaming Cursor ─────────────── */}
               {isStreaming && (
                 <span className="streaming-cursor">▋</span>
               )}

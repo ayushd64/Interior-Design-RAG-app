@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from api.routes import router as api_router
 from api.chat_routes import router as chat_router
+from api.agent_routes import router as agent_router
 from api.dashboard_routes import router as dashboard_router
 from database.connection import (
     connect_to_mongo,
@@ -59,6 +60,7 @@ app.add_middleware(
 # ── Include Routes ────────────────────────────────
 app.include_router(api_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
+app.include_router(agent_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
 
 # ── Root Endpoint ─────────────────────────────────

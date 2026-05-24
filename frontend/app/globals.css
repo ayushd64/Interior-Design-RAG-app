@@ -1338,3 +1338,61 @@ body {
   border-color     : var(--accent);
 }
 
+
+/* ── Agent Generated Images ──────────────────────── */
+.message-image-wrapper {
+  margin-top    : 12px;
+  border-radius : 12px;
+  overflow      : hidden;
+  border        : 1px solid var(--border);
+  max-width     : 100%;
+}
+
+.message-image {
+  width   : 100%;
+  height  : auto;
+  display : block;
+}
+
+.message-image-loading {
+  display         : flex;
+  align-items     : center;
+  justify-content : center;
+  padding         : 40px;
+  background-color : var(--bg-tertiary);
+  color           : var(--text-secondary);
+  font-size       : 14px;
+}
+
+
+
+/* ── Mode Toggle ─────────────────────────────────── */
+.header-right {
+  display     : flex;
+  align-items : center;
+  gap         : 14px;
+}
+
+.mode-toggle {
+  padding         : 8px 16px;
+  background-color : var(--bg-tertiary);
+  border          : 1px solid var(--border);
+  border-radius   : 20px;
+  color           : var(--text-secondary);
+  font-size       : 13px;
+  font-weight     : 600;
+  cursor          : pointer;
+  transition      : all 0.2s;
+  font-family     : inherit;
+}
+
+.mode-toggle:hover {
+  border-color: var(--accent);
+}
+
+.mode-toggle-active {
+  background-color : var(--accent);
+  color            : #ffffff;
+  border-color     : var(--accent);
+}
+
