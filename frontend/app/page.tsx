@@ -18,7 +18,13 @@ import {
   deleteChatFromDB
 } from "./services/api"
 
-const generateId = () => Math.random().toString(36).substr(2, 9)
+const generateId = () =>
+  typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
+
+
 
 // ── Main App Component (wrapped in auth) ──────
 function HomeContent() {
